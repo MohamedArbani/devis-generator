@@ -16,19 +16,6 @@ st.set_page_config(
 # Custom CSS
 st.markdown("""
 <style>
-    .main-header {
-        text-align: center;
-        color: #2c3e50;
-        padding: 1rem 0;
-        border-bottom: 2px solid #3498db;
-        margin-bottom: 2rem;
-    }
-    .form-section {
-        background-color: #f8f9fa;
-        padding: 1.5rem;
-        border-radius: 10px;
-        margin-bottom: 1rem;
-    }
     .success-message {
         background-color: #d4edda;
         color: #155724;
@@ -36,15 +23,38 @@ st.markdown("""
         border-radius: 5px;
         border-left: 4px solid #28a745;
     }
+    .sticky-summary {
+        position: sticky;
+        top: 1rem;
+        background: var(--background-color);
+        z-index: 999;
+        padding: 1rem;
+        border-radius: 10px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        max-height: calc(100vh - 2rem);
+        overflow-y: auto;
+    }
+    
+    /* Dark mode specific styling */
+    .stApp[data-theme="dark"] .sticky-summary {
+        background: rgb(14, 17, 23);
+        border: 1px solid rgb(49, 51, 63);
+    }
+    
+    /* Light mode specific styling */
+    .stApp[data-theme="light"] .sticky-summary {
+        background: rgb(255, 255, 255);
+        border: 1px solid rgb(230, 234, 241);
+    }
 </style>
 """, unsafe_allow_html=True)
 
 def main():
-    st.markdown('<h1 class="main-header">🏗️ Générateur de Devis Automatique</h1>', unsafe_allow_html=True)
+    st.title('🏗️ Générateur de Devis Automatique')
     
     # Initialize session state
-    if 'items' not in st.session_state:
-        st.session_state.items = []
+    if 'quote_items' not in st.session_state:
+        st.session_state.quote_items = []
     
     # Sidebar for template selection
     with st.sidebar:
@@ -53,7 +63,7 @@ def main():
         selected_template = st.selectbox("Sélectionner un template:", template_files)
         
         if st.button("🔄 Réinitialiser le formulaire"):
-            st.session_state.items = []
+            st.session_state.quote_items = []
             st.rerun()
     
     # Main form
@@ -61,7 +71,6 @@ def main():
     
     with col1:
         # Client Information Section
-        st.markdown('<div class="form-section">', unsafe_allow_html=True)
         st.subheader("👤 Informations Client")
         
         col_client1, col_client2 = st.columns(2)
@@ -75,10 +84,7 @@ def main():
             client_email = st.text_input("Email")
             project_location = st.text_input("Lieu du projet")
         
-        st.markdown('</div>', unsafe_allow_html=True)
-        
         # Quote Information Section
-        st.markdown('<div class="form-section">', unsafe_allow_html=True)
         st.subheader("📋 Informations Devis")
         
         col_quote1, col_quote2 = st.columns(2)
@@ -94,10 +100,6 @@ def main():
                                         "Paiement comptant",
                                         "30 jours net"])
         
-        st.markdown('</div>', unsafe_allow_html=True)
-        
-        # Items Section
-        st.markdown('<div class="form-section">', unsafe_allow_html=True)
         st.subheader("🛠️ Articles/Services")
         
         # Add new item form
@@ -120,29 +122,31 @@ def main():
                             "unit_price": item_unit_price,
                             "total": item_quantity * item_unit_price
                         }
-                        st.session_state.items.append(new_item)
+                        st.session_state.quote_items.append(new_item)
                         st.success("Article ajouté!")
                         st.rerun()
         
         # Display current items
-        if st.session_state.items:
+        if st.session_state.quote_items:
             st.write("**Articles ajoutés:**")
-            items_df = pd.DataFrame(st.session_state.items)
-            items_df['Prix unitaire'] = items_df['unit_price'].apply(lambda x: f"{x:,.2f} DH")
-            items_df['Total'] = items_df['total'].apply(lambda x: f"{x:,.2f} DH")
-            
-            display_df = items_df[['description', 'quantity', 'Prix unitaire', 'Total']].copy()
-            display_df.columns = ['Description', 'Quantité', 'Prix unitaire', 'Total']
-            
-            edited_df = st.data_editor(
-                display_df,
-                num_rows="dynamic",
-                use_container_width=True,
-                key="items_editor"
-            )
+            # Create DataFrame only if items exist and have the right structure
+            if len(st.session_state.quote_items) > 0 and all(isinstance(item, dict) for item in st.session_state.quote_items):
+                items_df = pd.DataFrame(st.session_state.quote_items)
+                items_df['Prix unitaire'] = items_df['unit_price'].apply(lambda x: f"{x:,.2f} DH")
+                items_df['Total'] = items_df['total'].apply(lambda x: f"{x:,.2f} DH")
+                
+                display_df = items_df[['description', 'quantity', 'Prix unitaire', 'Total']].copy()
+                display_df.columns = ['Description', 'Quantité', 'Prix unitaire', 'Total']
+                
+                edited_df = st.data_editor(
+                    display_df,
+                    num_rows="dynamic",
+                    use_container_width=True,
+                    key="items_editor"
+                )
             
             # Calculate totals
-            total_ht = sum(item['total'] for item in st.session_state.items)
+            total_ht = sum(item['total'] for item in st.session_state.quote_items)
             tva_rate = st.number_input("TVA (%)", min_value=0.0, max_value=100.0, value=20.0, step=0.1)
             tva_amount = total_ht * (tva_rate / 100)
             total_ttc = total_ht + tva_amount
@@ -154,29 +158,27 @@ def main():
                 st.write(f"**TVA ({tva_rate}%):** {tva_amount:,.2f} DH")
                 st.write(f"**Total TTC:** {total_ttc:,.2f} DH")
         
-        st.markdown('</div>', unsafe_allow_html=True)
         
         # Additional Information
-        st.markdown('<div class="form-section">', unsafe_allow_html=True)
         st.subheader("📝 Informations Complémentaires")
         notes = st.text_area("Notes/Observations", height=100)
         special_conditions = st.text_area("Conditions particulières", height=100)
-        st.markdown('</div>', unsafe_allow_html=True)
     
     with col2:
+        st.markdown('<div class="sticky-summary">', unsafe_allow_html=True)
         st.subheader("📊 Résumé")
         
-        if client_name and quote_number and st.session_state.items:
+        if client_name and quote_number and st.session_state.quote_items:
             # Form is valid, show summary
             st.success("✅ Formulaire complet")
             
             st.write("**Client:**", client_name)
             st.write("**Devis N°:**", quote_number)
             st.write("**Date:**", quote_date.strftime("%d/%m/%Y"))
-            st.write("**Nombre d'articles:**", len(st.session_state.items))
+            st.write("**Nombre d'articles:**", len(st.session_state.quote_items))
             
-            if st.session_state.items:
-                total_ht = sum(item['total'] for item in st.session_state.items)
+            if st.session_state.quote_items:
+                total_ht = sum(item['total'] for item in st.session_state.quote_items)
                 st.write("**Total HT:**", f"{total_ht:,.2f} DH")
             
             # Generate PDF button
@@ -194,7 +196,7 @@ def main():
                         'quote_date': quote_date,
                         'validity_period': validity_period,
                         'payment_terms': payment_terms,
-                        'items': st.session_state.items,
+                        'items': st.session_state.quote_items,
                         'tva_rate': tva_rate if 'tva_rate' in locals() else 20.0,
                         'notes': notes,
                         'special_conditions': special_conditions
@@ -226,12 +228,10 @@ def main():
                 st.write("- Nom du client")
             if not quote_number:
                 st.write("- Numéro de devis")
-            if not st.session_state.items:
+            if not st.session_state.quote_items:
                 st.write("- Articles/Services")
-    
-    # Footer
-    st.markdown("---")
-    st.markdown("*Générateur de Devis - Créé avec Streamlit*")
+        
+        st.markdown('</div>', unsafe_allow_html=True)
 
 if __name__ == "__main__":
     main()

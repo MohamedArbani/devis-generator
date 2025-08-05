@@ -137,6 +137,13 @@ class DevisGenerator:
                 f"{item['total']:,.2f}"
             ])
             total_ht += item['total']
+            items_data.append([
+                item['description'],
+                str(item['quantity']),
+                f"{item['unit_price']:,.2f}",
+                f"{item['total']:,.2f}"
+            ])
+            total_ht += item['total']
         
         # Calculate taxes
         tva_rate = data.get('tva_rate', 20.0)
